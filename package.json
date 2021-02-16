@@ -1,0 +1,67 @@
+{
+  "name": "my-code-actions",
+  "displayName": "My Code Actions",
+  "description": "Define Code Actions based on Language ID of the file",
+  "publisher": "rioj7",
+  "license": "MIT",
+  "version": "0.1.0",
+  "engines": {"vscode": "^1.49.0"},
+  "categories": ["Other"],
+  "keywords": ["code","actions","codeactions"],
+  "icon": "images/icon.png",
+  "galleryBanner": {"color": "#000080", "theme": "dark"},
+  "activationEvents": [ "*" ],
+  "contributes": {
+    "configuration": {
+      "title": "My Code Actions",
+      "properties": {
+        "my-code-actions.actions": {
+          "type": "object",
+          "scope": "resource",
+          "description": "Object with Code Actions for the different languageIDs (key)",
+          "default": {},
+          "patternProperties": {
+            "^\\[.+\\]$": {
+              "type": "object",
+              "description": "Object with Code Actions for the different titles (key)",
+              "default": {},
+              "patternProperties": {
+                "^.+$": {
+                  "type": "object",
+                  "description": "Code Action Object",
+                  "default": {},
+                  "properties": {
+                    "action": {
+                      "type": "string",
+                      "description": "(Optional) type of action (default: \"insert\")",
+                      "default": "insert"
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The text to insert"
+                    },
+                    "diagnostics": {
+                      "type": "array",
+                      "items": { "type": "string" },
+                      "description": "Regular expressions to match the diagnostics message"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  },
+  "main": "./my-code-actions.js",
+  "homepage": "https://github.com/rioj7/my-code-actions",
+  "bugs": {
+    "url": "https://github.com/rioj7/my-code-actions/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rioj7/my-code-actions.git"
+  }
+}
