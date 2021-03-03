@@ -4,8 +4,8 @@
   "description": "Define Code Actions based on Language ID of the file",
   "publisher": "rioj7",
   "license": "MIT",
-  "version": "0.1.0",
-  "engines": {"vscode": "^1.49.0"},
+  "version": "0.2.0",
+  "engines": {"vscode": "^1.50.0"},
   "categories": ["Other"],
   "keywords": ["code","actions","codeactions"],
   "icon": "images/icon.png",
@@ -34,16 +34,37 @@
                     "action": {
                       "type": "string",
                       "description": "(Optional) type of action (default: \"insert\")",
+                      "enum": ["insert", "replace"],
                       "default": "insert"
                     },
                     "text": {
                       "type": "string",
-                      "description": "The text to insert"
+                      "description": "The text to insert, or text with group references, like $1, that replaces the string matched by the last regex of \"replaceFind\"."
                     },
                     "diagnostics": {
                       "type": "array",
                       "items": { "type": "string" },
                       "description": "Regular expressions to match the diagnostics message"
+                    },
+                    "file": {
+                      "type": "string",
+                      "description": "(Optional) Which file to modify. If \"file\" starts with \"/\" it is relative to the workspace folder of the current file, otherwise it is relative to the current file (default: current file)"
+                    },
+                    "where": {
+                      "type": "string",
+                      "description": "(Optional) where in the file to insert, use \"insertFind\" property for location (default: \"start\")",
+                      "enum": ["start", "afterLast", "beforeFirst"],
+                      "enumDescriptions": ["At the start of the file", "After the last line matching the \"insertFind\" property or at the start", "Before the first line matching the \"insertFind\" property or at the start"],
+                      "default": "start"
+                    },
+                    "insertFind": {
+                      "type": "string",
+                      "description": "A regular expression that determines the insert location together with \"where\" property"
+                    },
+                    "replaceFind": {
+                      "type": ["string", "array"],
+                      "items": { "type": "string" },
+                      "description": "A string or array of strings. Each a regular expression, with capture groups, that is matched to the lines of the file. Each regex starts on the line where the previous regex has found a match."
                     }
                   }
                 }

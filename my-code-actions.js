@@ -1,8 +1,19 @@
 const vscode = require('vscode');
+const path = require('path');
 
 const extensionShortName = 'my-code-actions';
+const gActionInsert = 'insert';
+const gActionReplace = 'replace';
+const gActionStart = 'start';
 
 let languageMap = new Map();
+
+class CodeAction extends vscode.CodeAction {
+  constructor(title, kind) {
+    super(title, kind);
+    this.properties = {};
+  }
+}
 
 class LanguageCodeActionProvider {
   constructor(language) {
@@ -31,6 +42,97 @@ class LanguageCodeActionProvider {
     }
     return actions;
   }
+  /** @param {vscode.Uri} fileURI */
+  findTextDocument(fileURI) {
+    for (const document of vscode.workspace.textDocuments) {
+      if (document.isClosed) { continue; }
+      if (document.uri.scheme != 'file') { continue; }
+      if (document.uri.fsPath === fileURI.fsPath) { return document; }
+    }
+    return undefined;
+  }
+  /** @param {CodeAction} action */
+  resolveCodeAction(action, token) {
+    if (!this.active) { return action; }
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) { return action; }
+    let actionDocument = editor.document;
+    let file = getProperty(action.properties, 'file');
+    if (file) {
+      let fileURI = undefined;
+      let baseURI = undefined;
+      if (file.startsWith('/')) {
+        let workspace = vscode.workspace.getWorkspaceFolder(actionDocument.uri);
+        if (!workspace) {
+          vscode.window.showErrorMessage('Current file not in this Workspace');
+          return action;
+        }
+        baseURI = workspace.uri;
+        file = file.substring(1);
+      } else {
+        baseURI = vscode.Uri.file(path.dirname(editor.document.uri.fsPath));
+      }
+      fileURI = vscode.Uri.joinPath(baseURI, file);
+      actionDocument = this.findTextDocument(fileURI);
+      if (!actionDocument) {
+        vscode.window.showErrorMessage(`Please visit file, and keep tab: ${fileURI.fsPath}`, "Open file")
+          .then( result => {
+            if (!result) { return action; }
+            vscode.commands.executeCommand('vscode.open', fileURI);
+          });
+        return action;
+      }
+    }
+    let docAction = getProperty(action.properties, 'action', gActionInsert)
+    if (docAction === gActionInsert) {
+      let insertWhere = getProperty(action.properties, 'where', gActionStart);
+      let insertFind = getProperty(action.properties, 'insertFind');
+      if (!insertFind) { insertWhere = gActionStart; }
+      let insertText = getProperty(action.properties, 'text');
+      if (!insertText) { return action; }
+      insertFind = new RegExp(insertFind);
+      let lineNumber = 0;
+      if (insertWhere !== gActionStart) {
+        for (let n = 0; n < actionDocument.lineCount; ++n) {
+          if (insertFind.test(actionDocument.lineAt(n).text)) {
+            if (insertWhere === 'beforeFirst') {
+              lineNumber = n;
+              break;
+            }
+            if (insertWhere === 'afterLast') {
+              lineNumber = n+1;
+            }
+          }
+        }
+      }
+      if (lineNumber === actionDocument.lineCount) { insertText = '\n'+insertText; }
+      action.edit = new vscode.WorkspaceEdit();
+      action.edit.insert(actionDocument.uri, new vscode.Position(lineNumber, 0), insertText);
+    }
+    if (docAction === gActionReplace) {
+      let replaceFind = getProperty(action.properties, 'replaceFind');
+      let replaceText = getProperty(action.properties, 'text');
+      if(!(replaceFind && replaceText)) { return action; }
+      if (isString(replaceFind)) { replaceFind = [replaceFind]; }
+      let lineNumber = 0;
+      let match = undefined;
+      let findRegex;
+      for (const find of replaceFind) {
+        findRegex = new RegExp(find);
+        for (let n = lineNumber; n < actionDocument.lineCount; ++n, ++lineNumber) {
+          match = actionDocument.lineAt(n).text.match(findRegex);
+          if (match) { break; }
+        }
+      }
+      if (match) {
+        action.edit = new vscode.WorkspaceEdit();
+        let start = new vscode.Position(lineNumber, match.index);
+        let newText = match[0].replace(findRegex, replaceText);
+        action.edit.replace(actionDocument.uri, new vscode.Range(start, start.translate(0, match[0].length)), newText);
+      }
+    }
+    return action;
+  }
 }
 
 function isDiagnosticMatch(actionContext, testDiagnostics) {
@@ -43,10 +145,13 @@ function isDiagnosticMatch(actionContext, testDiagnostics) {
 }
 
 class QuickFix {
-  constructor(title, newText, testDiagnostics) {
+  constructor(title, testDiagnostics, properties, action) {
     this.title = title;
-    this.newText = newText;
+    this.newText = getProperty(properties, 'text');
     this.testDiagnostics = testDiagnostics;
+    this.properties = properties;
+    if (getProperty(this.properties, 'file')) { this.newText = undefined; }
+    if (action !== gActionInsert) { this.newText = undefined; }
   }
   provideCodeActions(document, range, actionContext) {
     let actions = [];
@@ -54,17 +159,18 @@ class QuickFix {
       if (actionContext.diagnostics.length === 0) { return actions; } // not on a diagnostic
       if (!isDiagnosticMatch(actionContext, this.testDiagnostics)) { return actions; }
     }
-    let searchText = this.newText;
-    let lastChar = this.newText.length-1;
-    if (this.newText[lastChar] === '\n') {
-      searchText = this.newText.substring(0, lastChar);
+    if (this.newText) {
+      let searchText = this.newText;
+      let lastChar = this.newText.length-1;
+      if (this.newText[lastChar] === '\n') {
+        searchText = this.newText.substring(0, lastChar);
+      }
+      var docText = document.getText();
+      if (docText.indexOf(searchText) >= 0) { return actions; }
     }
-    var docText = document.getText();
-    if (docText.indexOf(searchText) >= 0) { return actions; }
 
-    let action = new vscode.CodeAction(this.title, vscode.CodeActionKind.QuickFix);
-    action.edit = new vscode.WorkspaceEdit();
-    action.edit.insert(document.uri, new vscode.Position(0, 0), this.newText);
+    let action = new CodeAction(this.title, vscode.CodeActionKind.QuickFix);
+    action.properties = this.properties;
     actions.push(action);
     return actions;
   }
@@ -89,11 +195,10 @@ function readConfiguration(context) {
       for (const title in actionsetObj) {
         if (actionsetObj.hasOwnProperty(title)) {
           const properties = actionsetObj[title];
-          let action = getProperty(properties, 'action', 'insert');
-          if (action === 'insert') {
-            let text = getProperty(properties, 'text', 'unknown');
-            let diagnostics = getDiagnosticsProperty(properties);
-            actionset.push(new QuickFix(title, text, diagnostics));
+          const diagnostics = getDiagnosticsProperty(properties);
+          const action = getProperty(properties, 'action', gActionInsert);
+          if (action === gActionInsert || action === gActionReplace) {
+            actionset.push(new QuickFix(title, diagnostics, properties, action));
           }
         }
       }
