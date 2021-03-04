@@ -9,8 +9,9 @@ const gActionStart = 'start';
 let languageMap = new Map();
 
 class CodeAction extends vscode.CodeAction {
-  constructor(title, kind) {
+  constructor(title, kind, text) {
     super(title, kind);
+    this.text = text;
     this.properties = {};
   }
 }
@@ -88,7 +89,7 @@ class LanguageCodeActionProvider {
       let insertWhere = getProperty(action.properties, 'where', gActionStart);
       let insertFind = getProperty(action.properties, 'insertFind');
       if (!insertFind) { insertWhere = gActionStart; }
-      let insertText = getProperty(action.properties, 'text');
+      let insertText = action.text;
       if (!insertText) { return action; }
       insertFind = new RegExp(insertFind);
       let lineNumber = 0;
@@ -111,7 +112,7 @@ class LanguageCodeActionProvider {
     }
     if (docAction === gActionReplace) {
       let replaceFind = getProperty(action.properties, 'replaceFind');
-      let replaceText = getProperty(action.properties, 'text');
+      let replaceText = action.text;
       if(!(replaceFind && replaceText)) { return action; }
       if (isString(replaceFind)) { replaceFind = [replaceFind]; }
       let lineNumber = 0;
@@ -138,38 +139,48 @@ class LanguageCodeActionProvider {
 function isDiagnosticMatch(actionContext, testDiagnostics) {
   for (const diagnostic of actionContext.diagnostics) {
     for (const regex of testDiagnostics) {
-      if (regex.test(diagnostic.message)) { return true; }
+      let match = diagnostic.message.match(regex);
+      if (match) { return [match, regex]; }
     }
   }
-  return false;
+  return [undefined, undefined];
+}
+
+/** @param {string} text  @param {string[]} diagMatch  @param {RegExp} diagRegex */
+function useDiagnosticsGroups(text, diagMatch, diagRegex) {
+  return text.replace(/\{\{diag:(.*?)\}\}/g, (m, p1) => diagMatch[0].replace(diagRegex, p1));
 }
 
 class QuickFix {
   constructor(title, testDiagnostics, properties, action) {
     this.title = title;
-    this.newText = getProperty(properties, 'text');
+    this.text = getProperty(properties, 'text');
     this.testDiagnostics = testDiagnostics;
     this.properties = properties;
-    if (getProperty(this.properties, 'file')) { this.newText = undefined; }
-    if (action !== gActionInsert) { this.newText = undefined; }
+    this.searchText = (action === gActionInsert);
+    if (getProperty(this.properties, 'file')) { this.searchText = false; }
   }
   provideCodeActions(document, range, actionContext) {
     let actions = [];
+    let title = this.title;
+    let text = this.text;
     if (this.testDiagnostics) {
       if (actionContext.diagnostics.length === 0) { return actions; } // not on a diagnostic
-      if (!isDiagnosticMatch(actionContext, this.testDiagnostics)) { return actions; }
+      const [match, regex] = isDiagnosticMatch(actionContext, this.testDiagnostics);
+      if (!match) { return actions; }
+      title = useDiagnosticsGroups(title, match, regex);
+      text  = useDiagnosticsGroups(text, match, regex);
     }
-    if (this.newText) {
-      let searchText = this.newText;
-      let lastChar = this.newText.length-1;
-      if (this.newText[lastChar] === '\n') {
-        searchText = this.newText.substring(0, lastChar);
+    if (this.searchText) {
+      let searchText = text;
+      if (searchText.endsWith('\n')) {
+        searchText = searchText.substring(0, searchText.length-1);
       }
       var docText = document.getText();
       if (docText.indexOf(searchText) >= 0) { return actions; }
     }
 
-    let action = new CodeAction(this.title, vscode.CodeActionKind.QuickFix);
+    let action = new CodeAction(title, vscode.CodeActionKind.QuickFix, text);
     action.properties = this.properties;
     actions.push(action);
     return actions;
