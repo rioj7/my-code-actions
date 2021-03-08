@@ -4,7 +4,7 @@
   "description": "Define Code Actions based on Language ID of the file",
   "publisher": "rioj7",
   "license": "MIT",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "engines": {"vscode": "^1.50.0"},
   "categories": ["Other"],
   "keywords": ["code","actions","codeactions"],
@@ -65,6 +65,61 @@
                       "type": ["string", "array"],
                       "items": { "type": "string" },
                       "description": "A string or array of strings. Each a regular expression, with capture groups, that is matched to the lines of the file. Each regex starts on the line where the previous regex has found a match."
+                    },
+                    "edits": {
+                      "type": "array",
+                      "description": "Array with edits to be made",
+                      "items": {
+                        "type": "object",
+                        "description": "Code Action Object",
+                        "default": {},
+                        "properties": {
+                          "action": {
+                            "type": "string",
+                            "description": "(Optional) type of action (default: \"insert\")",
+                            "enum": ["insert", "replace"],
+                            "default": "insert"
+                          },
+                          "text": {
+                            "type": "string",
+                            "description": "The text to insert, or text with group references, like $1, that replaces the string matched by the last regex of \"replaceFind\"."
+                          },
+                          "file": {
+                            "type": "string",
+                            "description": "(Optional) Which file to modify. If \"file\" starts with \"/\" it is relative to the workspace folder of the current file, otherwise it is relative to the current file (default: file specified in main action)"
+                          },
+                          "where": {
+                            "type": "string",
+                            "description": "(Optional) where in the file to insert, use \"insertFind\" property for location (default: \"start\")",
+                            "enum": ["start", "afterLast", "beforeFirst"],
+                            "enumDescriptions": ["At the start of the file", "After the last line matching the \"insertFind\" property or at the start", "Before the first line matching the \"insertFind\" property or at the start"],
+                            "default": "start"
+                          },
+                          "insertFind": {
+                            "type": "string",
+                            "description": "A regular expression that determines the insert location together with \"where\" property"
+                          },
+                          "replaceFind": {
+                            "type": ["string", "array"],
+                            "items": { "type": "string" },
+                            "description": "A string or array of strings. Each a regular expression, with capture groups, that is matched to the lines of the file. Each regex starts on the line where the previous regex has found a match."
+                          },
+                          "condFind": {
+                            "type": ["string", "array"],
+                            "items": { "type": "string" },
+                            "description": "A string or array of strings. Each a regular expression, that is matched to the lines of the file. Each regex starts the search after the found match of the previous regex. The edit is performed when the strings are NOT found before \"condFindStop\"."
+                          },
+                          "condFindStop": {
+                            "type": "string",
+                            "description": "(Optional) A regular expression string, that is matched to the lines of the file. The \"condFind\" stops searching when a regex has no match before \"condFindStop\" is found. Only test for \"condFindStop\" when first string of \"condFind\" is found. If not defined there is no stop condition."
+                          },
+                          "needsContinue": {
+                            "type": ["string", "boolean"],
+                            "enum": ["nextCondFail", true, false],
+                            "description": "Does the next edit depend on the location or the content of this edit. Do we have to run the action again to continue with the edits. Determines if a message is shown to the user. If undefined then go to next edit, if true/false then stop edits and yes/no show Continue message, if \"nextCondFail\" (next edit condFind fails) result is true then stop edits and show Continue message and if false go to next edit. (default: conditional edit= true, other edit= undefined)"
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -72,6 +127,31 @@
             }
           },
           "additionalProperties": false
+        },
+        "my-code-actions.diagLookup": {
+          "type": "object",
+          "scope": "resource",
+          "description": "Object with arrays of lookup strings for a \"diagnostics\" capture group (key)",
+          "default": {},
+          "patternProperties": {
+            "^.+$": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Lookup table for the \"diagnostics\" capture group with this value, used in fields {{diagLookup:n}}"
+            }
+          }
+        },
+        "my-code-actions.lookup": {
+          "type": "object",
+          "scope": "resource",
+          "description": "Object with strings for a normal lookup by key",
+          "default": {},
+          "patternProperties": {
+            "^.+$": {
+              "type": "string",
+              "description": "key:value (string:string) pair, used in fields {{lookup:key}}"
+            }
+          }
         }
       }
     }

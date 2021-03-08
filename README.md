@@ -26,12 +26,46 @@ The actions are specified in the `settings.json` file for entry `my-code-actions
         * `"action": "replace"`
             * `replaceFind` : A string or array of strings. Each a regular expression, with capture groups, that is matched to the lines of the file. Each regex starts on the line where the previous regex has found a match.
             * `text`: the text with group references, like $1, that replaces the string matched by the last regex of `replaceFind`.
+    * `edits` : An array of edits that can have the following properties:
+        * `action` : `"insert"` or `"replace"`
+        * `file` : use a different file as specified in the action `file` property
+        * `text` : if the `action` is `"insert"` and the text string is found in the file this edit is skipped.
+        * `where` : `start` or `afterLast` or `beforeFirst`
+        * `insertFind`
+        * `replaceFind`
+        * `condFind` : A string or array of strings. Each a regular expression, that is matched to the lines of the file. Each regex starts the search after the found match of the previous regex. The edit is performed when the strings are NOT found before `condFindStop`.
+        * `condFindStop` : A regular expression string, that is matched to the lines of the file. The `condFind` stops searching when a regex has no match before `condFindStop` is found. Only test for `condFindStop` when first string of `condFind` is found. If not defined there is no stop condition.
+        * `needsContinue` : Does the next edit depend on the location or the content of this edit. Do we have to run the action again to continue with the edits. Determines if a message is shown to the user. (default: conditional edit= `true`, other edit= `undefined`)<br/>Depending on the value:
+            * `undefined` : (not present) go to next edit
+            * `true/false` : then stop edits and yes/no show Continue message
+            * `"nextCondFail"`: (next edit `condFind` fails)<br/>Use the `condFind` of the next edit to determine if we stop the edits:
+                * `condFind` is **not** found: then stop edits and show Continue message
+                * `condFind` is found : go to next edit.
 
 If you specify a `file` property and the file is not yet opened by Visual Studio Code (just a tab of the file is not enough) you get an error message asking you to open the file. You can use the `"Open file"` button in the message. If the file does not exists you get another error message allowing you to create the file. You must keep the file tab to be able to edit the file by the Quick Fix, otherwise you get the same error message. Apply the same Quick Fix when Visual Studio Code has read the file. You have to save the file yourself.
 
-Be aware that you need to escape the `\` and the `"` inside strings in the JSON file. But not needed for the `\n` character in the `text` property.
+If the insert text is already found in the source code that particular action is not shown. That only applies if the action is in the current file and does not contains an `edits` property.
 
-If the insert text is already found in the source code that particular action is not shown. That only applies if the action is in the current file.
+The other settings are:
+
+* `my-code-actions.diagLookup` : Object with arrays of lookup strings for diagnostics capture group 1 as key. The strings can be used in the <code>{{diagLookup:<em>n</em>}}</code> field.
+    ```
+      "my-code-actions.diagLookup": {
+        "mat-expansion-panel": ["MatExpansionModule", "@angular/material/expansion"]
+      }
+    ```
+* `my-code-actions.lookup` : Object with strings for a normal lookup by key<br/>Can be used to name often used strings. To use the same regular expression in different places you can name it:
+    ```
+    "my-code-actions.lookup": {
+      "appName": "app",
+      "NgModuleStart": "@NgModule\\(\\{",
+      "NgModuleEnd": "\\}\\)",
+      "importsStart": "imports\\s*:\\s*\\["
+    }
+    ```
+    You can define them at different levels (User/Workspace/Folder) and thus overrule named strings because VSC merges the content of a setting.
+
+Be aware that you need to escape the `\` and the `"` inside strings in the JSON file. But not needed for the `\n` character in the `text` property.
 
 There are multiple methods to see the Quick Fixes:
 
@@ -39,15 +73,19 @@ There are multiple methods to see the Quick Fixes:
 * click on the lightbulb shown in the editor (only visible when there is a Quick Fix)
 * select a problem in the `PROBLEMS` panel and use any of the above methods when the problem icon changes to a lightbulb.
 
-## Diagnostics capture groups
+## Fields
 
-Often part of the text you want inserted in the action is also mentioned in the diagnostics message. If you put this text in a capture group you can use this text in the `title` and the `text` property of the action.
+In all strings, apart from `diagnostics`, we can use fields to make actions more generic or reduce the possible typos.
 
-In the properties `title` and `text` every special field with the syntax:
+### Diagnostic Field: <code>{{diag:<em>text</em>}}</code>
+
+Often part of the text you want inserted in the action is also mentioned in the diagnostics message. If you put this text in a capture group you can use this capture group.
+
+The syntax:
 
 <code>{{diag:<em>replace_text</em>}}</code>
 
-is replaced with the _replace_text_ where capture group references (`$1` etc.) are taken from the diagnostics message regular expression.<br/>An example field: `{{diag:__$1__}}`
+The field is replaced with the _`replace_text`_ where capture group references (`$1` etc.) are taken from the diagnostics message regular expression.<br/>An example field: `{{diag:__$1__}}`
 
 The diagnostic fields are replaced before the `text` is used as a replace string using the last regex of `replaceFind`. So any capture group reference outside a diagnostic field refers to a capture group of `replaceFind`.
 
@@ -66,7 +104,33 @@ For python you can describe a generic import action:
   }
 ```
 
+### Diagnostic Lookup Field: <code>{{diagLookup:<em>n</em>}}</code>
+
+If you need to fill in different strings based on a text in the diagnostic message, like Class name, module names you can use the Diagnostic Lookup Field. The first capture group of the diagnostic message is used as a key in the settings `my-code-actions.diagLookup`. The array of strings returned can be used by using the number of the index in the field.
+
+The syntax:
+
+<code>{{diagLookup:<em>n</em>}}</code>
+
+_n_ is the index in the array.
+
+### Lookup Field: <code>{{lookup:<em>key</em>}}</code>
+
+If you use the same string (regular expression) multiple times you can reduce the possibility of typos by naming this string and using a Lookup Field.
+
+The syntax:
+
+<code>{{lookup:<em>key</em>}}</code>
+
+_key_ is used in the object that is the setting `my-code-actions.lookup`.
+
 ## An example
+
+This example contains:
+
+* a few insert actions for C and C++
+* a generic import action for Python
+* a generic import for Angular, where only the `MatExpansionModule` is specified, `mat-expansion-panel` is mentioned in the diagnostic message and captured as group 1.
 
 ```json
   "my-code-actions.actions": {
@@ -86,26 +150,62 @@ For python you can describe a generic import action:
         "insertFind": "^(import |from \\w+ import )"
       }
     },
-    "[javascript]": {
-      "construct imports": {
-        "diagnostics": ["is not a known element"],
-        "file": "config.js",
-        "text": "import = []"
-      },
-      "add components to import": {
-        "diagnostics": ["is not a known element"],
-        "file": "config.js",
-        "action": "replace",
-        "replaceFind": ["import\\s*=\\s*\\[", "(\\s*\\])"],
-        "text": ", components$1"
+    "[typescript]": {
+      "Add {{diagLookup:0}} to imports": {
+        "diagnostics": ["'(.*?)' is not a known element"],
+        "file": "{{lookup:appName}}.module.ts",
+        "edits": [
+          {
+            "where": "afterLast",
+            "insertFind": "^import",
+            "text": "import { {{diagLookup:0}} } from '{{diagLookup:1}}';\n",
+            "needsContinue": "nextCondFail"
+          },
+          {
+            "condFind": "{{lookup:NgModuleStart}}",
+            "where": "afterLast",
+            "insertFind": "^import",
+            "text": "@NgModule({ imports: [ {{diagLookup:0}} ] });\n",
+            "needsContinue": false
+          },
+          {
+            "condFind": ["{{lookup:NgModuleStart}}", "{{lookup:importsStart}}"],
+            "condFindStop": "{{lookup:NgModuleEnd}}",
+            "action": "replace",
+            "replaceFind": ["{{lookup:NgModuleStart}}", "({{lookup:NgModuleEnd}})"],
+            "text": ", imports: [ {{diagLookup:0}} ]\n$1",
+            "needsContinue": false
+          },
+          {
+            "action": "replace",
+            "replaceFind": ["{{lookup:NgModuleStart}}", "{{lookup:importsStart}}", "(\\s*\\])"],
+            "text": ", {{diagLookup:0}}$1"
+          }
+        ]
       }
     }
+  },
+  "my-code-actions.diagLookup": {
+    "mat-expansion-panel": ["MatExpansionModule", "@angular/material/expansion"],
+  },
+  "my-code-actions.lookup": {
+    "appName": "app",
+    "NgModuleStart": "@NgModule\\(\\{",
+    "NgModuleEnd": "\\}\\)",
+    "importsStart": "imports\\s*:\\s*\\["
   }
 ```
 
 ## Release Notes
 
+### v0.4.0
+* multiple edits for one action
+* use diagnostics capture group to lookup a set of strings: e.q. `{{diagLookup:0}}`
+* define lookup strings that can be redefined in workspace or folder: e.q. `{{lookup:appName}}`
+* all properties, except `diagnostics`, can have the fields: <code>{{diagLookup:<em>n</em>}}</code>, <code>{{lookup:<em>string</em>}}</code>, <code>{{diag:<em>string</em>}}</code>
+
 ### v0.3.0 diagnostic fields in `title` and `text`
+
 ### v0.2.0
 * location in file where the action applies
 * which `file` to apply action
