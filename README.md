@@ -14,6 +14,7 @@ The actions are specified in the `settings.json` file for entry `my-code-actions
 * the value is an object where the key is the `title` that is shown in the Quick Fix context menu.<br/>This makes it possible to define actions in the Global settings and merge them with actions specific for a workspace. (It is not working for Multi Root Workspaces yet (TODO))
 * the properties for an action are
     * `diagnostics` : (optional) an array of regular expressions. Only show the action when the cursor is on a problem (squiggle) and one of the regular expressions is a match for the problem diagnostic message.<br/>The capture groups of the matched regular expression can be [used in the `title` and the `text` property](#diagnostics-capture-groups).<br/>You can copy the diagnostic message from the `PROBLEMS` panel to get a starting string for the regular expression.
+    * `atCursor` : Regular expressions to search surrounding the cursor location. Search the match that contains the cursor location. Capture groups can be used in variable `{{atCursor:}}`"
     * `file` : Filepath for which file to modify. If `file` starts with `/` it is relative to the workspace folder of the current file, otherwise it is relative to the current file (default: current file)
     * `action` : a string describing the action to take: `insert` or `replace` (default: `insert`)<br/>Properties used when:
         * `"action": "insert"`
@@ -77,6 +78,8 @@ There are multiple methods to see the Quick Fixes:
 
 In all strings, apart from `diagnostics`, we can use fields to make actions more generic or reduce the possible typos.
 
+The diagnostic and atCursor fields are replaced before the `text` is used as a replace string using the last regex of `replaceFind`. So any capture group reference outside a field refers to a capture group of `replaceFind`.
+
 ### Diagnostic Field: <code>{{diag:<em>text</em>}}</code>
 
 Often part of the text you want inserted in the action is also mentioned in the diagnostics message. If you put this text in a capture group you can use this capture group.
@@ -86,8 +89,6 @@ The syntax:
 <code>{{diag:<em>replace_text</em>}}</code>
 
 The field is replaced with the _`replace_text`_ where capture group references (`$1` etc.) are taken from the diagnostics message regular expression.<br/>An example field: `{{diag:__$1__}}`
-
-The diagnostic fields are replaced before the `text` is used as a replace string using the last regex of `replaceFind`. So any capture group reference outside a diagnostic field refers to a capture group of `replaceFind`.
 
 For python you can describe a generic import action:
 
@@ -114,6 +115,16 @@ The syntax:
 
 _n_ is the index in the array.
 
+### atCursor Field: <code>{{atCursor:<em>text</em>}}</code>
+
+Often part of the text you want inserted in the action is near the cursor position. If you put this text in a capture group you can use this capture group. The range (squiggle) in the diagnostic message is often only marking a single identifier.
+
+The syntax:
+
+<code>{{atCursor:<em>replace_text</em>}}</code>
+
+The field is replaced with the _`replace_text`_ where capture group references (`$1` etc.) are taken from the `atCursor` regular expression.<br/>An example field: `{{atCursor:$1}}`
+
 ### Lookup Field: <code>{{lookup:<em>key</em>}}</code>
 
 If you use the same string (regular expression) multiple times you can reduce the possibility of typos by naming this string and using a Lookup Field.
@@ -131,6 +142,7 @@ This example contains:
 * a few insert actions for C and C++
 * a generic import action for Python
 * a generic import for Angular, where only the `MatExpansionModule` is specified, `mat-expansion-panel` is mentioned in the diagnostic message and captured as group 1.
+* add a method to a PHP class using `{{atCursor:}}` for the class name
 
 ```json
   "my-code-actions.actions": {
@@ -183,7 +195,16 @@ This example contains:
           }
         ]
       }
-    }
+    },
+    "[php]": {
+      "Add method {{diag:$1}} to {{atCursor:$1}}": {
+        "diagnostics": ["Undefined method '(.*?)'."],
+        "atCursor": "([_a-zA-Z0-9]+)::{{diag:$1}}",
+        "file": "{{atCursor:$1}}.php",
+        "where": "afterLast",
+        "insertFind": "class {{atCursor:$1}} {",
+        "text": "public function {{diag:$1}}() { }\n"
+      }
   },
   "my-code-actions.diagLookup": {
     "mat-expansion-panel": ["MatExpansionModule", "@angular/material/expansion"],
@@ -197,6 +218,10 @@ This example contains:
 ```
 
 ## Release Notes
+
+### v0.5.0
+* `atCursor` regex to search surrounding the cursor
+* `{{atCursor:}}` variable
 
 ### v0.4.0
 * multiple edits for one action

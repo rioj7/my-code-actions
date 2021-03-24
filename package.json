@@ -4,7 +4,7 @@
   "description": "Define Code Actions based on Language ID of the file",
   "publisher": "rioj7",
   "license": "MIT",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "engines": {"vscode": "^1.50.0"},
   "categories": ["Other"],
   "keywords": ["code","actions","codeactions"],
@@ -40,6 +40,10 @@
                     "text": {
                       "type": "string",
                       "description": "The text to insert, or text with group references, like $1, that replaces the string matched by the last regex of \"replaceFind\"."
+                    },
+                    "atCursor": {
+                      "type": "string",
+                      "description": "Regular expressions to search surrounding the cursor location. Search the match that contains the cursor location. Capture groups can be used in variable {{atCursor:}}"
                     },
                     "diagnostics": {
                       "type": "array",

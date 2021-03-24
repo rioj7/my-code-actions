@@ -18,19 +18,18 @@ let gLookup = undefined;
 let gDiagLookup = undefined;
 
 class CodeAction extends vscode.CodeAction {
-  constructor(title, kind, diagMatch, diagRegex) {
+  constructor(title, kind, matchRegex) {
     super(title, kind);
-    this.diagMatch = diagMatch;
-    this.diagRegex = diagRegex;
+    this.matchRegex = matchRegex;
     this.properties = {};
   }
   /** get property and eval fields if string or string[]
    * @param {string} prop */
   getProperty(obj, prop, deflt) {
     let val = getProperty(obj, prop, deflt);
-    if (isString(val)) { val = evalFields(val, this.diagMatch, this.diagRegex); }
+    if (isString(val)) { val = evalFields(val, this.matchRegex); }
     if (isArray(val)) {
-      val = val.map( v => isString(v) ? evalFields(v, this.diagMatch, this.diagRegex) : v);
+      val = val.map( v => isString(v) ? evalFields(v, this.matchRegex) : v);
     }
     return val;
   }
@@ -213,11 +212,32 @@ class LanguageCodeActionProvider {
   }
 }
 
+/** @returns {[string[], RegExp, vscode.Diagnostic]} */
 function isDiagnosticMatch(actionContext, testDiagnostics) {
   for (const diagnostic of actionContext.diagnostics) {
     for (const regex of testDiagnostics) {
       let match = diagnostic.message.match(regex);
-      if (match) { return [match, regex]; }
+      if (match) { return [match, regex, diagnostic]; }
+    }
+  }
+  return [undefined, undefined, undefined];
+}
+
+/** @param {string} atCursor @param {vscode.TextEditor} editor @param {vscode.Position} position @returns {[string[], RegExp]} */
+function atCursorMatch(atCursor, editor, position) {
+  // find text surrounding the position
+  let flags = 'g';
+  let document = editor.document
+  let docText = document.getText();
+  let offsetCursor = document.offsetAt(position);
+  if (atCursor && isString(atCursor)) {
+    let regex = new RegExp(atCursor, flags);
+    regex.lastIndex = 0;
+    let result;
+    while ((result=regex.exec(docText)) != null) {
+      if (result.index <= offsetCursor && offsetCursor <= regex.lastIndex) {
+        return [result, regex];
+      }
     }
   }
   return [undefined, undefined];
@@ -230,16 +250,41 @@ function findLiteral(document, searchText) {
   return document.getText().indexOf(searchText);
 }
 
-/** @param {string} text  @param {string[]} diagMatch  @param {RegExp} diagRegex */
-function evalFields(text, diagMatch, diagRegex) {
-  if (diagMatch) {
-    text = text.replace(/\{\{diag:(.*?)\}\}/g, (m, p1) => diagMatch[0].replace(diagRegex, p1));
-    if ((diagMatch.length >= 2) && (diagMatch[1].length > 0)) {
-      let diagLookup = gDiagLookup[diagMatch[1]];
+class MatchRegex {
+  constructor() {
+    this.diagMatch = undefined;
+    this.diagRegex = undefined;
+    this.diagnostic = undefined;
+    this.atCursorMatch = undefined;
+    this.atCursorRegex = undefined;
+  }
+  /** @param {string[]} diagMatch @param {RegExp} diagRegex @param {vscode.Diagnostic} diagnostic */
+  setDiag(diagMatch, diagRegex, diagnostic) {
+    this.diagMatch = diagMatch;
+    this.diagRegex = diagRegex;
+    this.diagnostic = diagnostic;
+  }
+  /** @param {string[]} atCursorMatch  @param {RegExp} atCursorRegex */
+  setAtCursor(atCursorMatch, atCursorRegex) {
+    this.atCursorMatch = atCursorMatch;
+    this.atCursorRegex = atCursorRegex;
+  }
+}
+
+/** @param {string} text @param {MatchRegex} matchRegex */
+function evalFields(text, matchRegex) {
+  //  diagMatch, diagRegex, atCursorMatch, atCursorRegex
+  if (matchRegex.diagMatch) {
+    text = text.replace(/\{\{diag:(.*?)\}\}/g, (m, p1) => matchRegex.diagMatch[0].replace(matchRegex.diagRegex, p1));
+    if ((matchRegex.diagMatch.length >= 2) && (matchRegex.diagMatch[1].length > 0)) {
+      let diagLookup = gDiagLookup[matchRegex.diagMatch[1]];
       if (diagLookup) {
         text = text.replace(/\{\{diagLookup:(.*?)\}\}/g, (m, p1) => diagLookup[Number(p1)] ?? "Unknown");
       }
     }
+  }
+  if (matchRegex.atCursorMatch) {
+    text = text.replace(/\{\{atCursor:(.*?)\}\}/g, (m, p1) => matchRegex.atCursorMatch[0].replace(matchRegex.atCursorRegex, p1));
   }
   return text.replace(/\{\{lookup:(.*?)\}\}/g, (m, p1) => gLookup[p1]);
 }
@@ -254,22 +299,32 @@ class QuickFix {
     if (getProperty(this.properties, 'file')) { this.searchText = false; }
     if (getProperty(this.properties, 'edits')) { this.searchText = false; }
   }
+  /** @param {vscode.TextDocument} document @param {vscode.CodeActionContext} actionContext */
   provideCodeActions(document, range, actionContext) {
     let actions = [];
     let title = this.title;
-    let diagMatch = undefined, diagRegex = undefined;
+    let matchRegex = new MatchRegex();
+    // let atCursorMatch = undefined, atCursorRegex = undefined;
     if (this.testDiagnostics) {
       if (actionContext.diagnostics.length === 0) { return actions; } // not on a diagnostic
-      [diagMatch, diagRegex] = isDiagnosticMatch(actionContext, this.testDiagnostics);
-      if (!diagMatch) { return actions; }
-      title = evalFields(title, diagMatch, diagRegex);
+      matchRegex.setDiag(...isDiagnosticMatch(actionContext, this.testDiagnostics));
+      if (!matchRegex.diagMatch) { return actions; }
     }
+    let atCursor = getProperty(this.properties, 'atCursor');
+    const editor = vscode.window.activeTextEditor;
+    if (atCursor && editor) {
+      let position = matchRegex.diagnostic ? matchRegex.diagnostic.range.start : editor.selection.start;
+      matchRegex.setAtCursor(...atCursorMatch(atCursor, editor, position));
+      if (!matchRegex.atCursorMatch) { return actions; }
+    }
+
+    title = evalFields(title, matchRegex);
     if (this.searchText) {
-      let searchText = evalFields(this.text, diagMatch, diagRegex);
+      let searchText = evalFields(this.text, matchRegex);
       if (findLiteral(document, searchText) >= 0) { return actions; }
     }
 
-    let action = new CodeAction(title, vscode.CodeActionKind.QuickFix, diagMatch, diagRegex);
+    let action = new CodeAction(title, vscode.CodeActionKind.QuickFix, matchRegex);
     action.properties = this.properties;
     actions.push(action);
     return actions;
