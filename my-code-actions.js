@@ -233,9 +233,17 @@ function atCursorMatch(atCursor, editor, position) {
   if (atCursor && isString(atCursor)) {
     let regex = new RegExp(atCursor, flags);
     regex.lastIndex = 0;
+    let foundStart = undefined;
     let result;
     while ((result=regex.exec(docText)) != null) {
+      if (result.index > offsetCursor) { break; }
       if (result.index <= offsetCursor && offsetCursor <= regex.lastIndex) {
+        foundStart = result.index;
+      }
+    }
+    if (foundStart !== undefined) {
+      regex.lastIndex = foundStart;
+      if ((result=regex.exec(docText)) != null) {
         return [result, regex];
       }
     }
