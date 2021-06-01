@@ -135,6 +135,7 @@ class LanguageCodeActionProvider {
         } else {
           baseURI = vscode.Uri.file(path.dirname(editor.document.uri.fsPath));
         }
+        file = evalFileVariables(file, actionDocument.uri);
         fileURI = vscode.Uri.joinPath(baseURI, file);
         actionDocument = this.findTextDocument(fileURI);
         if (!actionDocument) {
@@ -295,6 +296,34 @@ function evalFields(text, matchRegex) {
     text = text.replace(/\{\{atCursor:(.*?)\}\}/g, (m, p1) => matchRegex.atCursorMatch[0].replace(matchRegex.atCursorRegex, p1));
   }
   return text.replace(/\{\{lookup:(.*?)\}\}/g, (m, p1) => gLookup[p1]);
+}
+
+/** @param {string} text @param {vscode.Uri} currentURI */
+function evalFileVariables(text, currentURI) {
+  // let pathSeparator = process.platform === 'win32' ? '\\' : '/';
+  // text = text.replace(/\$\{pathSeparator\}/g, pathSeparator);
+  let fileBasename = path.basename(currentURI.path);
+  // let fileDirname = currentURI.path.substring(0, currentURI.path.length - (fileBasename.length+1));
+  // text = text.replace(/\$\{fileDirname\}/g, fileDirname);
+  let fileBasenameNoExtension = fileBasename;
+  let lastDot = fileBasenameNoExtension.lastIndexOf('.');
+  if (lastDot > 0) {
+    fileBasenameNoExtension = fileBasenameNoExtension.substring(0, lastDot);
+  }
+  text = text.replace(/\$\{fileBasenameNoExtension\}/g, fileBasenameNoExtension);
+  // let workspace = vscode.workspace.getWorkspaceFolder(currentURI);
+  // if (workspace) {
+  //   let fileWorkspaceFolder = workspace.uri.path;
+  //   text = text.replace(/\$\{fileWorkspaceFolder\}/g, fileWorkspaceFolder);
+  //   let relativeFileDirname = currentURI.path.substring(fileWorkspaceFolder.length+1);
+  //   relativeFileDirname = relativeFileDirname.substring(0, relativeFileDirname.length - (fileBasename.length+1));
+  //   if (relativeFileDirname.length === 0) { relativeFileDirname = '.'; }
+  //   text = text.replace(/\$\{relativeFileDirname\}/g, relativeFileDirname);
+  // }
+  // let pathSeparatorRE = pathSeparator === '/' ? '/' : '\\\\';
+  // let curDirRE = new RegExp(`${pathSeparatorRE}\\.${pathSeparatorRE}`, 'g');
+  // text = text.replace(curDirRE, pathSeparator);  // simplify  /./  to  /
+  return text;
 }
 
 class QuickFix {

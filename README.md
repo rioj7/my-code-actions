@@ -15,7 +15,7 @@ The actions are specified in the `settings.json` file for entry `my-code-actions
 * the properties for an action are
     * `diagnostics` : (optional) an array of regular expressions. Only show the action when the cursor is on a problem (squiggle) and one of the regular expressions is a match for the problem diagnostic message.<br/>The capture groups of the matched regular expression can be [used in the `title` and the `text` property](#diagnostics-capture-groups).<br/>You can copy the diagnostic message from the `PROBLEMS` panel to get a starting string for the regular expression.
     * `atCursor` : Regular expressions to search surrounding the cursor location. Search the match that contains the cursor location. Capture groups can be used in variable `{{atCursor:}}`"
-    * `file` : Filepath for which file to modify. If `file` starts with `/` it is relative to the workspace folder of the current file, otherwise it is relative to the current file (default: current file)
+    * `file` : File path for which file to modify. If `file` starts with `/` it is relative to the workspace folder of the current file, otherwise it is relative to the current file, use `/` as directory separator, you can use a few [variables](#file-variables) (default: current file)
     * `action` : a string describing the action to take: `insert` or `replace` (default: `insert`)<br/>Properties used when:
         * `"action": "insert"`
             * `where` : string describing the position of the insert (default: `"start"`)<br/>Possible values:
@@ -73,6 +73,14 @@ There are multiple methods to see the Quick Fixes:
 * use <kbd>Ctrl</kbd>+<kbd>.</kbd> in the editor
 * click on the lightbulb shown in the editor (only visible when there is a Quick Fix)
 * select a problem in the `PROBLEMS` panel and use any of the above methods when the problem icon changes to a lightbulb.
+
+## File Variables
+
+In the `file` property you can use the following [variable](https://code.visualstudio.com/docs/editor/variables-reference):
+
+* `${fileBasenameNoExtension}`
+
+This variable is constructed from the current file.
 
 ## Fields
 
@@ -218,6 +226,9 @@ This example contains:
 ```
 
 ## Release Notes
+
+### v0.6.0
+* file variables
 
 ### v0.5.0
 * `atCursor` regex to search surrounding the cursor
