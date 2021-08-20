@@ -57,8 +57,8 @@
                     "where": {
                       "type": "string",
                       "description": "(Optional) where in the file to insert, use \"insertFind\" property for location (default: \"start\")",
-                      "enum": ["start", "afterLast", "beforeFirst"],
-                      "enumDescriptions": ["At the start of the file", "After the last line matching the \"insertFind\" property or at the start", "Before the first line matching the \"insertFind\" property or at the start"],
+                      "enum": ["start", "beforeLast", "afterLast", "beforeFirst"],
+                      "enumDescriptions": ["At the start of the file", "Before the last line matching the \"insertFind\" property or at the start", "After the last line matching the \"insertFind\" property or at the start", "Before the first line matching the \"insertFind\" property or at the start"],
                       "default": "start"
                     },
                     "insertFind": {

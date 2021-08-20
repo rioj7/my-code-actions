@@ -167,6 +167,9 @@ class LanguageCodeActionProvider {
                 lineNumber = n;
                 break;
               }
+              if (insertWhere === 'beforeLast') {
+                lineNumber = n;
+              }
               if (insertWhere === 'afterLast') {
                 lineNumber = n+1;
               }
