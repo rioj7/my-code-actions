@@ -20,6 +20,7 @@ The actions are specified in the `settings.json` file for entry `my-code-actions
         * `"action": "insert"`
             * `where` : string describing the position of the insert (default: `"start"`)<br/>Possible values:
                 * `start` : At the start of the file
+                * `beforeLast` : Before the last line matching the `insertFind` property or at the start
                 * `afterLast` : After the last line matching the `insertFind` property or at the start
                 * `beforeFirst` : Before the first line matching the `insertFind` property or at the start
             * `insertFind` : A regular expression that determines the insert location together with `where` property.
@@ -31,7 +32,7 @@ The actions are specified in the `settings.json` file for entry `my-code-actions
         * `action` : `"insert"` or `"replace"`
         * `file` : use a different file as specified in the action `file` property
         * `text` : if the `action` is `"insert"` and the text string is found in the file this edit is skipped.
-        * `where` : `start` or `afterLast` or `beforeFirst`
+        * `where` : `start` or `beforeLast` or `afterLast` or `beforeFirst`
         * `insertFind`
         * `replaceFind`
         * `condFind` : A string or array of strings. Each a regular expression, that is matched to the lines of the file. Each regex starts the search after the found match of the previous regex. The edit is performed when the strings are NOT found before `condFindStop`.
@@ -226,6 +227,9 @@ This example contains:
 ```
 
 ## Release Notes
+
+### v0.7.0
+* `where` can be `beforeLast`
 
 ### v0.6.0
 * file variables

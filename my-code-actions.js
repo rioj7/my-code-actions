@@ -170,6 +170,9 @@ class LanguageCodeActionProvider {
               if (insertWhere === 'afterLast') {
                 lineNumber = n+1;
               }
+              if (insertWhere === 'beforeLast') { // #1 suggestion by mattpenner
+                lineNumber = n;
+              }
             }
           }
         }
