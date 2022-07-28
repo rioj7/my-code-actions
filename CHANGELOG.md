@@ -1,5 +1,12 @@
 # Change Log
 
+## [1.0.0] 2022-07-28
+### Added
+- Add `CHANGELOG.md`
+- `README.md`: location of cursor for the property `atCursor` regex
+### Fixed
+- `atCursor` can have fields
+
 ## [0.7.0] 2021-08-21
 ### Added
 - `where` can be `beforeLast`
