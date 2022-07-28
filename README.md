@@ -226,33 +226,6 @@ This example contains:
   }
 ```
 
-## Release Notes
-
-### v0.7.0
-* `where` can be `beforeLast`
-
-### v0.6.0
-* file variables
-
-### v0.5.0
-* `atCursor` regex to search surrounding the cursor
-* `{{atCursor:}}` variable
-
-### v0.4.0
-* multiple edits for one action
-* use diagnostics capture group to lookup a set of strings: e.q. `{{diagLookup:0}}`
-* define lookup strings that can be redefined in workspace or folder: e.q. `{{lookup:appName}}`
-* all properties, except `diagnostics`, can have the fields: <code>{{diagLookup:<em>n</em>}}</code>, <code>{{lookup:<em>string</em>}}</code>, <code>{{diag:<em>string</em>}}</code>
-
-### v0.3.0 diagnostic fields in `title` and `text`
-
-### v0.2.0
-* location in file where the action applies
-* which `file` to apply action
-* action `replace` with capture groups
-
-### v0.1.0 First release
-
 # TODO
 
 * Support for Multi Root Workspace (read configuration for current active editor)
