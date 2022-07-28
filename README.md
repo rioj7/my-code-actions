@@ -14,7 +14,7 @@ The actions are specified in the `settings.json` file for entry `my-code-actions
 * the value is an object where the key is the `title` that is shown in the Quick Fix context menu.<br/>This makes it possible to define actions in the Global settings and merge them with actions specific for a workspace. (It is not working for Multi Root Workspaces yet (TODO))
 * the properties for an action are
     * `diagnostics` : (optional) an array of regular expressions. Only show the action when the cursor is on a problem (squiggle) and one of the regular expressions is a match for the problem diagnostic message.<br/>The capture groups of the matched regular expression can be [used in the `title` and the `text` property](#diagnostics-capture-groups).<br/>You can copy the diagnostic message from the `PROBLEMS` panel to get a starting string for the regular expression.
-    * `atCursor` : Regular expressions to search surrounding the cursor location. Search the match that contains the cursor location. Capture groups can be used in variable `{{atCursor:}}`"
+    * `atCursor` : Regular expressions to search surrounding the [cursor location](#cursor-location-for-atCursor). Search the match that contains the cursor location. Capture groups can be used in variable `{{atCursor:}}`"
     * `file` : File path for which file to modify. If `file` starts with `/` it is relative to the workspace folder of the current file, otherwise it is relative to the current file, use `/` as directory separator, you can use a few [variables](#file-variables) (default: current file)
     * `action` : a string describing the action to take: `insert` or `replace` (default: `insert`)<br/>Properties used when:
         * `"action": "insert"`
@@ -74,6 +74,12 @@ There are multiple methods to see the Quick Fixes:
 * use <kbd>Ctrl</kbd>+<kbd>.</kbd> in the editor
 * click on the lightbulb shown in the editor (only visible when there is a Quick Fix)
 * select a problem in the `PROBLEMS` panel and use any of the above methods when the problem icon changes to a lightbulb.
+
+## cursor location for `atCursor`
+
+If there is no `diagnostics` test the start of the first selection is used. Most likely you don't have anything selected when asking for a Quick Fix so it is the current cursor location.
+
+If there is a `diagnostics` test the start of the diagnostic squiggle is used. If there is a diagnostic (entry in PROBLEMS panel) you can call the Quick Fix from the PROBLEMS panel. The cursor in the editor can be anywhere in the file. To be consistent in the file location the extension uses the start of the diagnostic squiggle. If this position does not fall inside a match or is at the edge of the match for the `atCursor` regex you don't get an action.
 
 ## File Variables
 
