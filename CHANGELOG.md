@@ -1,5 +1,9 @@
 # Change Log
 
+## [1.0.1] 2023-10-20
+### Fixed
+- if `atCursor` is missing results in error
+
 ## [1.0.0] 2022-07-28
 ### Added
 - Add `CHANGELOG.md`

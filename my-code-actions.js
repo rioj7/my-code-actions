@@ -350,9 +350,10 @@ class QuickFix {
       matchRegex.setDiag(...isDiagnosticMatch(actionContext, this.testDiagnostics));
       if (!matchRegex.diagMatch) { return actions; }
     }
-    let atCursor = evalFields(getProperty(this.properties, 'atCursor'), matchRegex);
+    let atCursor = getProperty(this.properties, 'atCursor');
     const editor = vscode.window.activeTextEditor;
     if (atCursor && editor) {
+      atCursor = evalFields(atCursor, matchRegex);
       let position = matchRegex.diagnostic ? matchRegex.diagnostic.range.start : editor.selection.start;
       matchRegex.setAtCursor(...atCursorMatch(atCursor, editor, position));
       if (!matchRegex.atCursorMatch) { return actions; }
