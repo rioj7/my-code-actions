@@ -220,9 +220,10 @@ This example contains:
         "insertFind": "class {{atCursor:$1}} {",
         "text": "public function {{diag:$1}}() { }\n"
       }
+    }
   },
   "my-code-actions.diagLookup": {
-    "mat-expansion-panel": ["MatExpansionModule", "@angular/material/expansion"],
+    "mat-expansion-panel": ["MatExpansionModule", "@angular/material/expansion"]
   },
   "my-code-actions.lookup": {
     "appName": "app",
