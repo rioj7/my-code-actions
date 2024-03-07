@@ -15,7 +15,7 @@ The actions are specified in the `settings.json` file for entry `my-code-actions
 * the properties for an action are
     * `diagnostics` : (optional) an array of regular expressions. Only show the action when the cursor is on a problem (squiggle) and one of the regular expressions is a match for the problem diagnostic message.<br/>The capture groups of the matched regular expression can be [used in the `title` and the `text` property](#diagnostics-capture-groups).<br/>You can copy the diagnostic message from the `PROBLEMS` panel to get a starting string for the regular expression.
     * `atCursor` : Regular expressions to search surrounding the [cursor location](#cursor-location-for-atCursor). Search the match that contains the cursor location. Capture groups can be used in variable `{{atCursor:}}`"
-    * `file` : File path for which file to modify. If `file` starts with `/` it is relative to the workspace folder of the current file, otherwise it is relative to the current file, use `/` as directory separator, you can use a few [variables](#file-variables) (default: current file)
+    * `file` : File path for which file to modify. If `file` starts with `/` it is relative to the workspace folder of the current file, otherwise it is relative to the current file, use `/` as directory separator, you can use a few [variables](#file-variables) and [fields](#fields) (default: current file)
     * `action` : a string describing the action to take: `insert` or `replace` (default: `insert`)<br/>Properties used when:
         * `"action": "insert"`
             * `where` : string describing the position of the insert (default: `"start"`)<br/>Possible values:
@@ -23,18 +23,32 @@ The actions are specified in the `settings.json` file for entry `my-code-actions
                 * `beforeLast` : Before the last line matching the `insertFind` property or at the start
                 * `afterLast` : After the last line matching the `insertFind` property or at the start
                 * `beforeFirst` : Before the first line matching the `insertFind` property or at the start
-            * `insertFind` : A regular expression that determines the insert location together with `where` property.
-            * `text`: the text to insert.<br/>You must add a `\n` to the text if it should be on a single line.
+            * `insertFind` : A regular expression that determines the insert location together with `where` property. Can contain [fields](#fields).
+            * `text`: the text to insert, can contain [fields](#fields).<br/>You must add a `\n` to the text if it should be on a single line.
         * `"action": "replace"`
-            * `replaceFind` : A string or array of strings. Each a regular expression, with capture groups, that is matched to the lines of the file. Each regex starts on the line where the previous regex has found a match.
-            * `text`: the text with group references, like $1, that replaces the string matched by the last regex of `replaceFind`.
+            * `where` : string describing the position to start the search (default: `"start"`)<br/>Possible values:
+                * `start` : At the start of the file
+                * `atCursor` : the position where the `atCursor` property matches
+            * `replaceFind` : A string or array of strings. Each a regular expression, with capture groups and [fields](#fields), that is matched to the lines of the file. Each regex starts on the line where the previous regex has found a match.
+            * `replaceGlobal` : (optional) Replace all the occurrences in the file starting at `where`. (default: `false`).
+            * `text`: the text with group references, like $1, and [fields](#fields) that replaces the string matched by the last regex of `replaceFind`.
+    * `ask` : an array of Input Box descriptions. Entered values can be used with the <code>{{ask:<em>name</em>}}</code> [field](#fields).  
+      If you have multiple edits it is best to put all the needed asks in the first edit. This allows you to escape all the edits.  
+      An [Input Box](https://code.visualstudio.com/api/references/vscode-api#InputBoxOptions) description has the following properties (each property value can use [fields](#fields), even already asked names):
+        * `name` : the name to store the entered value
+        * `placeHolder` : (optional)
+        * `prompt` : (optional)
+        * `title` : (optional)
+        * `value` : (optional)
     * `edits` : An array of edits that can have the following properties:
         * `action` : `"insert"` or `"replace"`
         * `file` : use a different file as specified in the action `file` property
         * `text` : if the `action` is `"insert"` and the text string is found in the file this edit is skipped.
-        * `where` : `start` or `beforeLast` or `afterLast` or `beforeFirst`
+        * `where` : `start` or `beforeLast` or `afterLast` or `beforeFirst` or `atCursor`
         * `insertFind`
         * `replaceFind`
+        * `replaceGlobal`
+        * `ask`
         * `condFind` : A string or array of strings. Each a regular expression, that is matched to the lines of the file. Each regex starts the search after the found match of the previous regex. The edit is performed when the strings are NOT found before `condFindStop`.
         * `condFindStop` : A regular expression string, that is matched to the lines of the file. The `condFind` stops searching when a regex has no match before `condFindStop` is found. Only test for `condFindStop` when first string of `condFind` is found. If not defined there is no stop condition.
         * `needsContinue` : Does the next edit depend on the location or the content of this edit. Do we have to run the action again to continue with the edits. Determines if a message is shown to the user. (default: conditional edit= `true`, other edit= `undefined`)<br/>Depending on the value:
@@ -140,6 +154,14 @@ The syntax:
 
 The field is replaced with the _`replace_text`_ where capture group references (`$1` etc.) are taken from the `atCursor` regular expression.<br/>An example field: `{{atCursor:$1}}`
 
+### ask Field: <code>{{ask:<em>name</em>}}</code>
+
+When you have 1 or more `ask` Input Boxes you can use the entered value with this field.
+
+The syntax:
+
+<code>{{ask:<em>name</em>}}</code>
+
 ### Lookup Field: <code>{{lookup:<em>key</em>}}</code>
 
 If you use the same string (regular expression) multiple times you can reduce the possibility of typos by naming this string and using a Lookup Field.
@@ -155,6 +177,7 @@ _key_ is used in the object that is the setting `my-code-actions.lookup`.
 This example contains:
 
 * a few insert actions for C and C++
+* in HTML replace a class name and also in the used CSS file
 * a generic import action for Python
 * a generic import for Angular, where only the `MatExpansionModule` is specified, `mat-expansion-panel` is mentioned in the diagnostic message and captured as group 1.
 * add a method to a PHP class using `{{atCursor:}}` for the class name
@@ -167,6 +190,40 @@ This example contains:
       "include mylib": {
         "text": "#include \"mylib.h\"\n",
         "diagnostics": ["identifier \"[^\"]+\" is undefined"]
+      }
+    },
+    "[html]": {
+      "Rename CSS class selector": {
+        "atCursor": " class=\"([^\"]+)\"",
+        "edits": [
+          {
+            "file": "style.css",
+            "action": "replace",
+            "ask": [
+              {
+                "name": "find",
+                "placeHolder": "Enter class",
+                "title": "Which class to replace:",
+                "value": "{{atCursor:$1}}"
+              },
+              {
+                "name": "replace",
+                "placeHolder": "Enter class",
+                "title": "Rename:",
+                "value": "{{ask:find}}"
+              }
+            ],
+            "replaceFind": "\\.{{ask:find}}\\b",
+            "replaceGlobal": true,
+            "text": ".{{ask:replace}}"
+          },
+          {
+            "action": "replace",
+            "replaceFind": "( class=\"[^\"]*?)\\b{{ask:find}}\\b([^\"]*\")",
+            "replaceGlobal": true,
+            "text": "$1{{ask:replace}}$2"
+          }
+        ]
       }
     },
     "[python]": {

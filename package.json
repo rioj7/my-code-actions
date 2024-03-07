@@ -4,7 +4,7 @@
   "description": "Define Code Actions based on Language ID of the file",
   "publisher": "rioj7",
   "license": "MIT",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "engines": {"vscode": "^1.50.0"},
   "categories": ["Other"],
   "keywords": ["code","actions","codeactions"],
@@ -57,7 +57,7 @@
                     "where": {
                       "type": "string",
                       "description": "(Optional) where in the file to insert, use \"insertFind\" property for location (default: \"start\")",
-                      "enum": ["start", "beforeLast", "afterLast", "beforeFirst"],
+                      "enum": ["start", "beforeLast", "afterLast", "beforeFirst", "atCursor"],
                       "enumDescriptions": ["At the start of the file", "Before the last line matching the \"insertFind\" property or at the start", "After the last line matching the \"insertFind\" property or at the start", "Before the first line matching the \"insertFind\" property or at the start"],
                       "default": "start"
                     },
@@ -69,6 +69,25 @@
                       "type": ["string", "array"],
                       "items": { "type": "string" },
                       "description": "A string or array of strings. Each a regular expression, with capture groups, that is matched to the lines of the file. Each regex starts on the line where the previous regex has found a match."
+                    },
+                    "replaceGlobal": {
+                      "type": "boolean",
+                      "description": "Replace all the occurrences in the file. (default: false)"
+                    },
+                    "ask": {
+                      "type": "array",
+                      "description": "Array with Ask String questions",
+                      "items": {
+                        "type": "object",
+                        "description": "Ask String properties for Input Box",
+                        "properties": {
+                          "name": { "type": "string" },
+                          "placeHolder": { "type": "string" },
+                          "prompt": { "type": "string" },
+                          "title": { "type": "string" },
+                          "value": { "type": "string" }
+                        }
+                      }
                     },
                     "edits": {
                       "type": "array",
@@ -95,7 +114,7 @@
                           "where": {
                             "type": "string",
                             "description": "(Optional) where in the file to insert, use \"insertFind\" property for location (default: \"start\")",
-                            "enum": ["start", "beforeLast", "afterLast", "beforeFirst"],
+                            "enum": ["start", "beforeLast", "afterLast", "beforeFirst", "atCursor"],
                             "enumDescriptions": ["At the start of the file", "Before the last line matching the \"insertFind\" property or at the start", "After the last line matching the \"insertFind\" property or at the start", "Before the first line matching the \"insertFind\" property or at the start"],
                             "default": "start"
                           },
@@ -107,6 +126,25 @@
                             "type": ["string", "array"],
                             "items": { "type": "string" },
                             "description": "A string or array of strings. Each a regular expression, with capture groups, that is matched to the lines of the file. Each regex starts on the line where the previous regex has found a match."
+                          },
+                          "replaceGlobal": {
+                            "type": "boolean",
+                            "description": "Replace all the occurrences in the file. (default: false)"
+                          },
+                          "ask": {
+                            "type": "array",
+                            "description": "Array with Ask String questions",
+                            "items": {
+                              "type": "object",
+                              "description": "Ask String properties for Input Box",
+                              "properties": {
+                                "name": { "type": "string" },
+                                "placeHolder": { "type": "string" },
+                                "prompt": { "type": "string" },
+                                "title": { "type": "string" },
+                                "value": { "type": "string" }
+                              }
+                            }
                           },
                           "condFind": {
                             "type": ["string", "array"],

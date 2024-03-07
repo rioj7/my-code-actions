@@ -1,5 +1,11 @@
 # Change Log
 
+## [1.1.0] 2024-03-07
+### Added
+- <code>{{ask:<em>name</em>}}</code> field, and `ask` Input Box descriptions in edits
+- `replaceGlobal`: replace all occurrences in the file
+- `where`: `atCursor` option, start replace search where `atCursor` matched
+
 ## [1.0.1] 2023-10-20
 ### Fixed
 - if `atCursor` is missing results in error

@@ -4,6 +4,7 @@ const path = require('path');
 
 function isString(obj) { return typeof obj === 'string'; }
 function isArray(obj) { return Array.isArray(obj); }
+function isObject(obj) { return (typeof obj === 'object') && !isArray(obj);}
 function isBoolean(obj) { return typeof obj === 'boolean'; }
 function getConfig(section) { return vscode.workspace.getConfiguration(extensionShortName, null).get(section); }
 function getProperty(obj, prop, deflt) { return obj.hasOwnProperty(prop) ? obj[prop] : deflt; };
@@ -17,20 +18,44 @@ let languageMap = new Map();
 let gLookup = undefined;
 let gDiagLookup = undefined;
 
+function dataStructSubstitution(v, cbData, callback) {
+  if (isString(v)) {
+    return callback(v, cbData);
+  }
+  if (Array.isArray(v)) {
+    let result = [];
+    for (const v1 of v) {
+      let v1a = dataStructSubstitution(v1, cbData, callback);
+      if (v1a === undefined) { return undefined; }
+      result.push(v1a);
+    }
+    return result;
+  }
+  if (isObject(v)) {
+    let result = {};
+    for (const key in v) {
+      if (v.hasOwnProperty(key)) {
+        let v1a = dataStructSubstitution(v[key], cbData, callback);
+        if (v1a === undefined) { return undefined; }
+        result[key] = v1a;
+      }
+    }
+    return result;
+  }
+  return v;
+}
+
 class CodeAction extends vscode.CodeAction {
   constructor(title, kind, matchRegex) {
     super(title, kind);
     this.matchRegex = matchRegex;
     this.properties = {};
   }
-  /** get property and eval fields if string or string[]
+  /** get property and eval fields if string or string[] or object with string values
    * @param {string} prop */
   getProperty(obj, prop, deflt) {
     let val = getProperty(obj, prop, deflt);
-    if (isString(val)) { val = evalFields(val, this.matchRegex); }
-    if (isArray(val)) {
-      val = val.map( v => isString(v) ? evalFields(v, this.matchRegex) : v);
-    }
+    val = dataStructSubstitution(val, this.matchRegex, evalFields);
     return val;
   }
 }
@@ -71,10 +96,14 @@ class LanguageCodeActionProvider {
     }
     return undefined;
   }
-  /** @param {vscode.TextDocument} actionDocument @returns {[RegExpExecArray, number?, RegExp?]} */
-  findLocation(actionDocument, doFind, doFindStop) {
+  /** @param {vscode.TextDocument} actionDocument @param {any} doFind @param {any=} doFindStop @param {vscode.Position=} startPos @returns {[RegExpExecArray, number?, RegExp?]} */
+  findLocation(actionDocument, doFind, doFindStop, startPos) {
     if (isString(doFind)) { doFind = [doFind]; }
     let lineNumber = 0, lastIndex = 0;
+    if (startPos) {
+      lineNumber = startPos.line;
+      lastIndex = startPos.character;
+    }
     let match = undefined;
     let findRegex;
     let testStop = false;
@@ -107,11 +136,11 @@ class LanguageCodeActionProvider {
     return match;
   }
   /** @param {CodeAction} action */
-  resolveCodeAction(action, token) {
+  async resolveCodeAction(action, token) {
     if (!this.active) { return action; }
     const editor = vscode.window.activeTextEditor;
     if (!editor) { return action; }
-    let edits = action.getProperty(action.properties, 'edits');
+    let edits = getProperty(action.properties, 'edits');
     if (!edits) {
       edits = [ action.properties ];
     }
@@ -119,6 +148,18 @@ class LanguageCodeActionProvider {
     for (let editIdx = 0; editIdx < edits.length; ++editIdx) {
       const edit = edits[editIdx];
 
+      let ask = getProperty(edit, 'ask', []);
+      for (let ib of ask) {
+        ib = dataStructSubstitution(ib, action.matchRegex, evalFields);
+        let name = getProperty(ib, 'name', 'askresult');
+        let placeHolder = getProperty(ib, 'placeHolder');
+        let prompt = getProperty(ib, 'prompt');
+        let title = getProperty(ib, 'title');
+        let value = getProperty(ib, 'value');
+        let result = await vscode.window.showInputBox({placeHolder, prompt, title, value});
+        if (result === undefined) { return action; }
+        action.matchRegex.ask.set(name, result);
+      }
       let actionDocument = editor.document;
       let file = action.getProperty(edit, 'file', fileDefault);
       if (file) {
@@ -184,12 +225,18 @@ class LanguageCodeActionProvider {
         let replaceFind = action.getProperty(edit, 'replaceFind');
         let replaceText = action.getProperty(edit, 'text');
         if (!(replaceFind && replaceText)) { return action; }
-        const [match, lineNumber, findRegex] = this.findLocation(actionDocument, replaceFind);
-        if (match) {
+        let replaceGlobal = action.getProperty(edit, 'replaceGlobal', false);
+        let where = action.getProperty(edit, 'where', 'start');
+        let startPos = where === 'atCursor' ? editor.document.positionAt(action.matchRegex.atCursorMatch.index) : undefined;
+        while (true) {
+          const [match, lineNumber, findRegex] = this.findLocation(actionDocument, replaceFind, undefined, startPos);
+          if (!match) { break; }
+          startPos = new vscode.Position(lineNumber, findRegex.lastIndex);
           if (!action.edit) { action.edit = new vscode.WorkspaceEdit(); }
           let start = new vscode.Position(lineNumber, match.index);
           let newText = match[0].replace(findRegex, replaceText);
           action.edit.replace(actionDocument.uri, new vscode.Range(start, start.translate(0, match[0].length)), newText);
+          if (!replaceGlobal) { break; }
         }
       }
       let stopEdits = false, showContMessage = false;
@@ -269,6 +316,7 @@ class MatchRegex {
     this.diagnostic = undefined;
     this.atCursorMatch = undefined;
     this.atCursorRegex = undefined;
+    this.ask = new Map();
   }
   /** @param {string[]} diagMatch @param {RegExp} diagRegex @param {vscode.Diagnostic} diagnostic */
   setDiag(diagMatch, diagRegex, diagnostic) {
@@ -298,6 +346,10 @@ function evalFields(text, matchRegex) {
   if (matchRegex.atCursorMatch) {
     text = text.replace(/\{\{atCursor:(.*?)\}\}/g, (m, p1) => matchRegex.atCursorMatch[0].replace(matchRegex.atCursorRegex, p1));
   }
+  text = text.replace(/\{\{ask:(.*?)\}\}/g, (m, p1) => {
+    let s = matchRegex.ask.get(p1);
+    return s === undefined ? 'Unknown' : s;
+  });
   return text.replace(/\{\{lookup:(.*?)\}\}/g, (m, p1) => gLookup[p1]);
 }
 
